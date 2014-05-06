@@ -34,21 +34,25 @@ handle_connection(ConnectionManager, MySock, Accum) ->
                     handle_connection(ConnectionManager, MySock, [Accum, B])
             end;
         {error, closed} ->
-            ConnectionManager ! {remove_sock, MySock}
+            ConnectionManager ! {remove_sock, self(), MySock}
     end.
+
+send(FormattedMsg, SenderSock, Socks) ->
+    Recipients = lists:delete(SenderSock, Socks),
+    lists:map(fun(Sock) -> gen_tcp:send(Sock, FormattedMsg) end, Recipients).
 
 manage_connections(Socks) ->
     receive
         {add_sock, Sock} ->
             ConnectioonManager = self(),
-            spawn(fun() -> handle_connection(ConnectioonManager, Sock, []) end),
+            Joiner = spawn(fun() -> handle_connection(ConnectioonManager, Sock, []) end),
+            send(io_lib:format("~p joins", [Joiner]), Sock, Socks),
             manage_connections([Sock|Socks]);
-        {remove_sock, Sock} -> 
+        {remove_sock, Leaver, Sock} -> 
+            send(io_lib:format("~p leaves", [Leaver]), Sock, Socks),
             manage_connections(lists:delete(Sock, Socks));
         {send_msg, Sender, SenderSock, Msg} -> 
-            FormattedMsg = io_lib:format("~p: ~p", [Sender, Msg]),
-            Recipients = lists:delete(SenderSock, Socks),
-            lists:map(fun(Sock) -> gen_tcp:send(Sock, FormattedMsg) end, Recipients),
+            send(io_lib:format("~p: ~p", [Sender, Msg]), SenderSock, Socks),
             manage_connections(Socks);
         die -> ok
     end.
