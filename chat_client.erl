@@ -30,14 +30,3 @@ recv_loop(Sock, Accum) ->
         {error, closed} ->
             ok
     end.
-
-
-
-
-
-
-
-
-
-
-
