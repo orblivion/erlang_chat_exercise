@@ -7,12 +7,15 @@ server() ->
     ConnectioonManager = self(),
     spawn(fun() -> new_connections(ConnectioonManager, LSock) end),
     manage_connections([]),
-    io:format("Ending. At least I should be.").
+    ok = gen_tcp:close(LSock).
 
 new_connections(ConnectionManager, LSock) ->
-    {ok, Sock} = gen_tcp:accept(LSock),
-    ConnectionManager ! {add_sock, Sock},
-    new_connections(ConnectionManager, LSock).
+    case gen_tcp:accept(LSock) of 
+        {ok, Sock} -> 
+            ConnectionManager ! {add_sock, Sock},
+            new_connections(ConnectionManager, LSock);
+        {error, closed} -> ok
+    end.
 
 handle_connection(ConnectionManager, MySock, Accum) ->
     case gen_tcp:recv(MySock, 0) of
@@ -21,7 +24,8 @@ handle_connection(ConnectionManager, MySock, Accum) ->
                 [MsgEnd|Next] ->
                     Msg = binary_to_list(list_to_binary([Accum, MsgEnd])),
                     case Msg of
-                        "kill" -> ConnectionManager ! die;
+                        "/kill" -> 
+                            ConnectionManager ! die;
                         _ ->
                             ConnectionManager ! {send_msg, self(), MySock, Msg},
                             handle_connection(ConnectionManager, MySock, [Next])
@@ -46,5 +50,5 @@ manage_connections(Socks) ->
             Recipients = lists:delete(SenderSock, Socks),
             lists:map(fun(Sock) -> gen_tcp:send(Sock, FormattedMsg) end, Recipients),
             manage_connections(Socks);
-        {die} -> ok
+        die -> ok
     end.
