@@ -4,8 +4,8 @@
 server() ->
     {ok, LSock} = gen_tcp:listen(5678, [binary, {packet, 0}, 
                                         {active, false}]),
-    ConnectioonManager = self(),
-    spawn(fun() -> new_connections(ConnectioonManager, LSock) end),
+    ConnectionManager = self(),
+    spawn(fun() -> new_connections(ConnectionManager, LSock) end),
     manage_connections([]),
     ok = gen_tcp:close(LSock).
 
@@ -44,8 +44,8 @@ send(FormattedMsg, SenderSock, Socks) ->
 manage_connections(Socks) ->
     receive
         {add_sock, Sock} ->
-            ConnectioonManager = self(),
-            Joiner = spawn(fun() -> handle_connection(ConnectioonManager, Sock, []) end),
+            ConnectionManager = self(),
+            Joiner = spawn(fun() -> handle_connection(ConnectionManager, Sock, []) end),
             send(io_lib:format("~p joins", [Joiner]), Sock, Socks),
             manage_connections([Sock|Socks]);
         {remove_sock, Leaver, Sock} -> 
